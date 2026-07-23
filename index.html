@@ -35,32 +35,28 @@
       adds a penalty for simulated material that overruns past the
       experiment&rsquo;s toe &mdash; RMSE alone can miss that.
     </p>
-
-    <details class="scoring-panel" id="scoringPanel">
-      <summary>Custom scoring (9-metric)</summary>
-      <p class="legend-note">
-        Weight each metric from the multi-metric evaluation framework, then
-        switch the heatmap to <strong>custom</strong> to colour by your own
-        weighted composite instead of RMSE.
-      </p>
-      <div class="score-preset-row">
-        <button type="button" id="presetPaper">Paper (6)</button>
-        <button type="button" id="presetEqual">Equal (9)</button>
-        <button type="button" id="presetClear">Clear</button>
-      </div>
-      <div id="scoreRows" class="score-rows"></div>
-    </details>
   </aside>
 
   <main class="main">
     <div class="main-header">
-      <h2 class="display">gmod &times; phi fit quality</h2>
-      <p>Click cells to select up to six at once &mdash; each gets its own colour in the particle plot and comparison table on the right. The star marks the best-fit cell by combined score.</p>
-      <div class="metric-toggle" role="group" aria-label="Heatmap metric">
-        <button data-metric="combined" class="active">combined</button>
-        <button data-metric="rmse">RMSE only</button>
-        <button data-metric="custom">custom score</button>
+      <div class="main-header-text">
+        <h2 class="display">gmod &times; phi fit quality</h2>
+        <p>Click cells to select up to six at once &mdash; each gets its own colour in the particle plot and comparison table on the right. The heatmap is coloured by your custom weighted score; the star marks the best-fit cell by combined score.</p>
       </div>
+
+      <details class="scoring-panel" id="scoringPanel">
+        <summary>Custom scoring (9-metric)</summary>
+        <p class="legend-note">
+          Weight each metric from the multi-metric evaluation framework to
+          set how the heatmap colouring is computed.
+        </p>
+        <div class="score-preset-row">
+          <button type="button" id="presetPaper">Paper (6)</button>
+          <button type="button" id="presetEqual">Equal (9)</button>
+          <button type="button" id="presetClear">Clear</button>
+        </div>
+        <div id="scoreRows" class="score-rows"></div>
+      </details>
     </div>
 
     <div class="panels">
