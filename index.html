@@ -35,15 +35,31 @@
       adds a penalty for simulated material that overruns past the
       experiment&rsquo;s toe &mdash; RMSE alone can miss that.
     </p>
+
+    <details class="scoring-panel" id="scoringPanel">
+      <summary>Custom scoring (12-metric)</summary>
+      <p class="legend-note">
+        Weight each metric from the multi-metric evaluation framework, then
+        switch the heatmap to <strong>custom</strong> to colour by your own
+        weighted composite instead of RMSE.
+      </p>
+      <div class="score-preset-row">
+        <button type="button" id="presetPaper">Paper (9)</button>
+        <button type="button" id="presetEqual">Equal (12)</button>
+        <button type="button" id="presetClear">Clear</button>
+      </div>
+      <div id="scoreRows" class="score-rows"></div>
+    </details>
   </aside>
 
   <main class="main">
     <div class="main-header">
       <h2 class="display">gmod &times; phi fit quality</h2>
-      <p>Click any cell to load its simulated particle cloud against the digitized experiment on the right. The star marks the best-fit cell by combined score.</p>
+      <p>Click cells to select up to six at once &mdash; each gets its own colour in the particle plot and comparison table on the right. The star marks the best-fit cell by combined score.</p>
       <div class="metric-toggle" role="group" aria-label="Heatmap metric">
         <button data-metric="combined" class="active">combined</button>
         <button data-metric="rmse">RMSE only</button>
+        <button data-metric="custom">custom score</button>
       </div>
     </div>
 
@@ -65,23 +81,26 @@
 
       <section class="panel">
         <div class="panel-title">
-          <h3>Selected cell &mdash; deposit profile</h3>
+          <h3>Selected cells &mdash; deposit profile</h3>
           <span class="hint">particles vs. experiment</span>
         </div>
         <div class="canvas-wrap">
           <canvas id="detailCanvas" width="680" height="420"></canvas>
         </div>
         <div class="detail-legend">
-          <span><span class="swatch" style="background:var(--focus)"></span>experiment (scaled)</span>
-          <span><span class="swatch" style="background:rgba(80,80,80,0.6)"></span>sim particles</span>
+          <span><span class="swatch" style="background:#000000"></span>experiment (scaled)</span>
           <span><span class="swatch" style="background:var(--ink-faint)"></span>slide / floor</span>
         </div>
-        <div class="cell-readout">
-          <div class="stat"><span class="k">gmod</span><span class="v num" id="statGmod">–</span></div>
-          <div class="stat"><span class="k">phi</span><span class="v num" id="statPhi">–</span></div>
-          <div class="stat"><span class="k">RMSE</span><span class="v num" id="statRmse">–</span></div>
-          <div class="stat"><span class="k">combined</span><span class="v num" id="statCombined">–</span></div>
-        </div>
+
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th></th><th>gmod</th><th>phi</th><th>RMSE</th><th>combined</th><th>custom</th>
+            </tr>
+          </thead>
+          <tbody id="compareBody"></tbody>
+        </table>
+        <p class="legend-note" id="compareEmpty">Click a heatmap cell to select it.</p>
       </section>
     </div>
 
