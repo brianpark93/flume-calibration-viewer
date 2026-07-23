@@ -50,11 +50,61 @@
     },
     {
       "angle": 30,
-      "n_cells": 189,
-      "best_gmod": 19.474,
+      "n_cells": 210,
+      "best_gmod": 21.526,
       "best_phi": 0.5632,
-      "best_rmse": 2.914,
-      "best_combined": 3.01
+      "best_rmse": 2.786,
+      "best_combined": 2.803
+    }
+  ],
+  "score_meta": [
+    {
+      "key": "score_rmse_global",
+      "label": "RMSE (global)"
+    },
+    {
+      "key": "score_rmse_front",
+      "label": "RMSE (front)"
+    },
+    {
+      "key": "score_rmse_mid",
+      "label": "RMSE (mid)"
+    },
+    {
+      "key": "score_rmse_tail",
+      "label": "RMSE (tail)"
+    },
+    {
+      "key": "score_Cs",
+      "label": "Centroid (streamwise)"
+    },
+    {
+      "key": "score_Cv",
+      "label": "Centroid (vertical)"
+    },
+    {
+      "key": "score_Ps",
+      "label": "Peak location (streamwise)"
+    },
+    {
+      "key": "score_Pv",
+      "label": "Peak location (vertical)"
+    },
+    {
+      "key": "score_R",
+      "label": "Runout distance"
+    },
+    {
+      "key": "score_Sfront",
+      "label": "Front slope"
+    },
+    {
+      "key": "score_A",
+      "label": "Total area"
+    },
+    {
+      "key": "score_Iratio",
+      "label": "Inclusion ratio"
     }
   ]
 }
