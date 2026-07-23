@@ -1,0 +1,60 @@
+{
+  "angles": [
+    {
+      "angle": 60,
+      "n_cells": 400,
+      "best_gmod": 1.0,
+      "best_phi": 0.8368,
+      "best_rmse": 2.689,
+      "best_combined": 2.757
+    },
+    {
+      "angle": 55,
+      "n_cells": 400,
+      "best_gmod": 3.053,
+      "best_phi": 0.7737,
+      "best_rmse": 2.522,
+      "best_combined": 2.522
+    },
+    {
+      "angle": 50,
+      "n_cells": 400,
+      "best_gmod": 1.0,
+      "best_phi": 0.7316,
+      "best_rmse": 2.572,
+      "best_combined": 2.611
+    },
+    {
+      "angle": 45,
+      "n_cells": 400,
+      "best_gmod": 1.0,
+      "best_phi": 0.6474,
+      "best_rmse": 1.859,
+      "best_combined": 1.89
+    },
+    {
+      "angle": 40,
+      "n_cells": 400,
+      "best_gmod": 33.842,
+      "best_phi": 0.6895,
+      "best_rmse": 1.763,
+      "best_combined": 1.763
+    },
+    {
+      "angle": 35,
+      "n_cells": 400,
+      "best_gmod": 37.947,
+      "best_phi": 0.6474,
+      "best_rmse": 1.968,
+      "best_combined": 1.968
+    },
+    {
+      "angle": 30,
+      "n_cells": 178,
+      "best_gmod": 15.368,
+      "best_phi": 0.5632,
+      "best_rmse": 2.969,
+      "best_combined": 3.016
+    }
+  ]
+}
