@@ -10,7 +10,6 @@ const state = {
   data: null,        // parsed data/{angle}deg.json
   grid: null,        // Map "gi,pj" -> cell
   selected: [],       // [{gi,pj}], order = selection order = color order
-  metric: "combined", // "combined" | "rmse" | "custom"
   weights: {},        // score key -> 0..100
 };
 
@@ -67,15 +66,6 @@ function customScore(cell) {
   return den > 0 ? num / den : null;
 }
 
-function cellMetricValue(cell) {
-  if (state.metric === "custom") return customScore(cell);
-  return cell[state.metric];
-}
-
-function metricIsHigherBetter() {
-  return state.metric === "custom";
-}
-
 // ---------------- data loading ----------------
 
 async function loadManifest() {
@@ -119,21 +109,16 @@ function bestCell() {
 }
 
 function metricRange() {
-  const higherBetter = metricIsHigherBetter();
+  // custom score is 0-100, higher is better
   const vals = [];
   state.grid.forEach((c) => {
-    const v = cellMetricValue(c);
+    const v = customScore(c);
     if (v !== null && v !== undefined && isFinite(v)) vals.push(v);
   });
   vals.sort((a, b) => a - b);
   if (!vals.length) return [0, 1];
-  if (higherBetter) {
-    const lo = vals[Math.ceil(vals.length * 0.1)] ?? vals[0];
-    const hi = vals[vals.length - 1];
-    return [lo, Math.max(hi, lo + 0.01)];
-  }
-  const lo = vals[0];
-  const hi = vals[Math.floor(vals.length * 0.9)];
+  const lo = vals[Math.ceil(vals.length * 0.1)] ?? vals[0];
+  const hi = vals[vals.length - 1];
   return [lo, Math.max(hi, lo + 0.01)];
 }
 
@@ -154,7 +139,6 @@ function drawHeatmap() {
   ctx.clearRect(0, 0, w, h);
 
   const [lo, hi] = metricRange();
-  const higherBetter = metricIsHigherBetter();
 
   for (let gi = 0; gi < nG; gi++) {
     for (let pj = 0; pj < nP; pj++) {
@@ -166,14 +150,13 @@ function drawHeatmap() {
         ctx.fillRect(x, y, cell, cell);
         continue;
       }
-      const v = cellMetricValue(c);
+      const v = customScore(c);
       if (v === null || v === undefined || !isFinite(v)) {
         ctx.fillStyle = cssVar("--line");
         ctx.fillRect(x, y, cell, cell);
         continue;
       }
-      let t = (v - lo) / (hi - lo);
-      if (higherBetter) t = 1 - t;
+      const t = 1 - (v - lo) / (hi - lo); // higher score = greener
       ctx.fillStyle = rdylgnColor(t);
       ctx.fillRect(x, y, cell, cell);
     }
@@ -423,7 +406,7 @@ function renderScoringPanel() {
       const val = parseInt(e.target.value, 10);
       state.weights[m.key] = val;
       $("wv_" + m.key).textContent = val;
-      if (state.metric === "custom") drawHeatmap();
+      drawHeatmap();
       renderReadouts();
     });
   });
@@ -436,7 +419,7 @@ function applyPreset(preset) {
     else if (preset === "clear") state.weights[m.key] = 0;
   });
   renderScoringPanel();
-  if (state.metric === "custom") drawHeatmap();
+  drawHeatmap();
   renderReadouts();
 }
 
@@ -453,21 +436,11 @@ async function init() {
   els.bestPhi = $("bestPhi");
   els.bestRmse = $("bestRmse");
   els.bestCombined = $("bestCombined");
-  els.metricBtns = document.querySelectorAll(".metric-toggle button");
   els.compareBody = $("compareBody");
   els.compareEmpty = $("compareEmpty");
   els.scoreRows = $("scoreRows");
 
   els.heatmap.addEventListener("click", heatmapPick);
-
-  els.metricBtns.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      els.metricBtns.forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      state.metric = btn.dataset.metric;
-      drawHeatmap();
-    });
-  });
 
   $("presetPaper").addEventListener("click", () => applyPreset("paper"));
   $("presetEqual").addEventListener("click", () => applyPreset("equal"));
