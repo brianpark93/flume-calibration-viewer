@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Angle of Repose — SPH Mohr-Coulomb Calibration Explorer</title>
+<meta name="description" content="Interactive gmod/phi calibration heatmaps for a dry-sand SPH granular flow model, seven slope angles, with per-cell particle-vs-experiment comparison." />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <span class="eyebrow">SPH · Mohr–Coulomb</span>
+      <h1 class="display">Angle of Repose</h1>
+      <p>Calibration explorer for dry-sand flume flows, 30&ndash;60&deg;</p>
+    </div>
+
+    <div>
+      <p class="angle-list-label">Slope angle</p>
+      <div class="angle-list" id="angleList"></div>
+    </div>
+
+    <div class="readout">
+      <div class="readout-label">Best fit (this angle)</div>
+      <div class="readout-row"><span class="k">gmod</span><span class="v num" id="bestGmod">–</span></div>
+      <div class="readout-row"><span class="k">phi</span><span class="v num" id="bestPhi">–</span></div>
+      <div class="readout-row"><span class="k">RMSE</span><span class="v num" id="bestRmse">–</span></div>
+      <div class="readout-row"><span class="k">combined</span><span class="v num" id="bestCombined">–</span></div>
+    </div>
+
+    <p class="legend-note">
+      Each cell is one SPH solve: fixed gmod &amp; phi, deposit compared
+      against the scaled experimental profile. <strong>combined</strong>
+      adds a penalty for simulated material that overruns past the
+      experiment&rsquo;s toe &mdash; RMSE alone can miss that.
+    </p>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <h2 class="display">gmod &times; phi fit quality</h2>
+      <p>Click any cell to load its simulated particle cloud against the digitized experiment on the right. The star marks the best-fit cell by combined score.</p>
+      <div class="metric-toggle" role="group" aria-label="Heatmap metric">
+        <button data-metric="combined" class="active">combined</button>
+        <button data-metric="rmse">RMSE only</button>
+      </div>
+    </div>
+
+    <div class="panels">
+      <section class="panel" id="heatmapWrap">
+        <div class="panel-title">
+          <h3>Fit quality grid</h3>
+          <span class="hint mono" id="heatmapMeta"></span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="heatmapCanvas" width="560" height="560"></canvas>
+        </div>
+        <div class="axis-caption">
+          <span>&larr; gmod (MPa)</span>
+          <span>phi (rad) &uarr;</span>
+        </div>
+        <p class="status mono" id="status"></p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h3>Selected cell &mdash; deposit profile</h3>
+          <span class="hint">particles vs. experiment</span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="detailCanvas" width="680" height="420"></canvas>
+        </div>
+        <div class="detail-legend">
+          <span><span class="swatch" style="background:var(--focus)"></span>experiment (scaled)</span>
+          <span><span class="swatch" style="background:rgba(168,83,46,0.6)"></span>sim particles</span>
+          <span><span class="swatch" style="background:var(--ink-faint)"></span>slide / floor</span>
+        </div>
+        <div class="cell-readout">
+          <div class="stat"><span class="k">gmod</span><span class="v num" id="statGmod">–</span></div>
+          <div class="stat"><span class="k">phi</span><span class="v num" id="statPhi">–</span></div>
+          <div class="stat"><span class="k">RMSE</span><span class="v num" id="statRmse">–</span></div>
+          <div class="stat"><span class="k">combined</span><span class="v num" id="statCombined">–</span></div>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      SPH granular-flow calibration &middot; Mohr&ndash;Coulomb, non-associated flow &middot; 20&times;20 grid per angle, gmod 1&ndash;40&nbsp;MPa &times; phi 0.5&ndash;0.9&nbsp;rad
+    </footer>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
