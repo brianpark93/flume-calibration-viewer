@@ -50,11 +50,11 @@
     },
     {
       "angle": 30,
-      "n_cells": 229,
-      "best_gmod": 23.579,
+      "n_cells": 400,
+      "best_gmod": 29.737,
       "best_phi": 0.5632,
-      "best_rmse": 2.741,
-      "best_combined": 2.749
+      "best_rmse": 2.708,
+      "best_combined": 2.717
     }
   ],
   "score_meta": [
