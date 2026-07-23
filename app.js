@@ -197,27 +197,36 @@ function drawDetail() {
 
   // domain: fixed per angle so the view doesn't jump between cells
   const allX = data.exp_x.concat(data.wall_x.length ? data.wall_x : []);
-  const allZ = data.exp_z.concat(data.wall_z.length ? data.wall_z : []);
   let xMin = -0.25, xMax = Math.max(1.1, Math.max(...allX) + 0.15);
   let zMin = -0.08, zMax = 0.38;
 
-  const pad = 34;
-  const sx = (x) => pad + ((x - xMin) / (xMax - xMin)) * (w - pad * 1.4);
-  const sy = (z) => h - pad - ((z - zMin) / (zMax - zMin)) * (h - pad * 1.6);
+  // equal-aspect scale: same pixels-per-metre for x and z, so the plot is
+  // never stretched. Fit inside the available area, then centre it.
+  const padL = 42, padR = 14, padT = 10, padB = 26;
+  const availW = w - padL - padR;
+  const availH = h - padT - padB;
+  const scale = Math.min(availW / (xMax - xMin), availH / (zMax - zMin));
+  const plotW = (xMax - xMin) * scale;
+  const plotH = (zMax - zMin) * scale;
+  const originX = padL + (availW - plotW) / 2;
+  const originY = padT + (availH - plotH) / 2;
+
+  const sx = (x) => originX + (x - xMin) * scale;
+  const sy = (z) => originY + plotH - (z - zMin) * scale;
 
   // grid
   ctx.strokeStyle = cssVar("--line");
   ctx.lineWidth = 1;
-  ctx.font = "10.5px ui-monospace, SFMono-Regular, Consolas, monospace";
+  ctx.font = "10.5px Arial, Helvetica, sans-serif";
   ctx.fillStyle = cssVar("--ink-faint");
   for (let xv = Math.ceil(xMin * 5) / 5; xv <= xMax; xv += 0.2) {
     const px = sx(xv);
-    ctx.beginPath(); ctx.moveTo(px, pad * 0.3); ctx.lineTo(px, h - pad); ctx.stroke();
-    ctx.fillText(xv.toFixed(1), px - 8, h - pad + 14);
+    ctx.beginPath(); ctx.moveTo(px, originY); ctx.lineTo(px, originY + plotH); ctx.stroke();
+    ctx.fillText(xv.toFixed(1), px - 8, originY + plotH + 14);
   }
   for (let zv = 0; zv <= zMax; zv += 0.1) {
     const py = sy(zv);
-    ctx.beginPath(); ctx.moveTo(pad, py); ctx.lineTo(w - pad * 0.4, py); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(originX, py); ctx.lineTo(originX + plotW, py); ctx.stroke();
     ctx.fillText(zv.toFixed(2), 2, py + 3);
   }
 
@@ -235,7 +244,7 @@ function drawDetail() {
 
   // simulated particles
   if (c) {
-    ctx.fillStyle = "rgba(168, 83, 46, 0.45)";
+    ctx.fillStyle = "rgba(80, 80, 80, 0.45)";
     for (let i = 0; i < c.px.length; i++) {
       const px = sx(c.px[i]), py = sy(c.pz[i]);
       if (px < 0 || px > w || py < 0 || py > h) continue;
@@ -263,7 +272,7 @@ function drawDetail() {
   // axis border
   ctx.strokeStyle = cssVar("--line-strong");
   ctx.lineWidth = 1.2;
-  ctx.strokeRect(pad, pad * 0.3, w - pad * 1.4 - pad, h - pad - pad * 0.3);
+  ctx.strokeRect(originX, originY, plotW, plotH);
 }
 
 // ---------------- readouts ----------------
