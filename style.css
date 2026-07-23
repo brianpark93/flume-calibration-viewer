@@ -248,42 +248,34 @@ a { color: var(--accent); }
   min-width: 0;
 }
 
-.main-header h2 {
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.main-header-text {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.main-header-text h2 {
   font-size: 20px;
   margin: 0 0 4px;
 }
 
-.main-header p {
+.main-header-text p {
   margin: 0;
   color: var(--ink-muted);
   font-size: 13px;
   max-width: 62ch;
 }
 
-.metric-toggle {
-  display: inline-flex;
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-top: 10px;
-}
-
-.metric-toggle button {
-  background: #ffffff;
-  border: none;
-  color: var(--ink-muted);
-  padding: 6px 14px;
-  font-size: 12.5px;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.metric-toggle button + button { border-left: 1px solid var(--line-strong); }
-
-.metric-toggle button.active {
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: bold;
+.main-header .scoring-panel {
+  flex: 0 0 300px;
+  width: 300px;
 }
 
 .panels {
