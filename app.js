@@ -2,8 +2,7 @@
 
 const MAX_SELECTED = 6;
 const SELECTION_COLORS = ["#1a5fb4", "#c2185b", "#7b1fa2", "#00838f", "#e65100", "#33691e"];
-const PAPER_COMPOSITE_KEYS = ["score_rmse_global", "score_rmse_front", "score_rmse_mid", "score_rmse_tail",
-  "score_Ps", "score_Pv", "score_R", "score_Sfront", "score_Iratio"];
+const PAPER_COMPOSITE_KEYS = ["score_rmse", "score_Ps", "score_Pv", "score_R", "score_Sfront", "score_Iratio"];
 
 const state = {
   manifest: null,
