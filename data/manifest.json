@@ -50,29 +50,17 @@
     },
     {
       "angle": 30,
-      "n_cells": 210,
-      "best_gmod": 21.526,
+      "n_cells": 229,
+      "best_gmod": 23.579,
       "best_phi": 0.5632,
-      "best_rmse": 2.786,
-      "best_combined": 2.803
+      "best_rmse": 2.741,
+      "best_combined": 2.749
     }
   ],
   "score_meta": [
     {
-      "key": "score_rmse_global",
-      "label": "RMSE (global)"
-    },
-    {
-      "key": "score_rmse_front",
-      "label": "RMSE (front)"
-    },
-    {
-      "key": "score_rmse_mid",
-      "label": "RMSE (mid)"
-    },
-    {
-      "key": "score_rmse_tail",
-      "label": "RMSE (tail)"
+      "key": "score_rmse",
+      "label": "RMSE"
     },
     {
       "key": "score_Cs",
