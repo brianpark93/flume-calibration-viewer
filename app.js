@@ -196,7 +196,8 @@ function drawDetail() {
   ctx.clearRect(0, 0, w, h);
 
   // domain: fixed per angle so the view doesn't jump between cells
-  const allX = data.exp_x.concat(data.wall_x.length ? data.wall_x : []);
+  const wallX = (data.wall_segments || []).flatMap((s) => s.x);
+  const allX = data.exp_x.concat(wallX);
   let xMin = -0.25, xMax = Math.max(1.1, Math.max(...allX) + 0.15);
   let zMin = -0.08, zMax = 0.38;
 
@@ -230,17 +231,19 @@ function drawDetail() {
     ctx.fillText(zv.toFixed(2), 2, py + 3);
   }
 
-  // wall
-  if (data.wall_x.length) {
-    ctx.strokeStyle = cssVar("--ink-faint");
-    ctx.lineWidth = 2;
+  // wall -- slide and floor are separate physical parts (separate rigid
+  // node sets); draw each segment as its own polyline so they never
+  // connect to each other and zigzag across the plot.
+  ctx.strokeStyle = cssVar("--ink-faint");
+  ctx.lineWidth = 2;
+  (data.wall_segments || []).forEach((seg) => {
     ctx.beginPath();
-    data.wall_x.forEach((x, i) => {
-      const px = sx(x), py = sy(data.wall_z[i]);
+    seg.x.forEach((x, i) => {
+      const px = sx(x), py = sy(seg.z[i]);
       i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
     });
     ctx.stroke();
-  }
+  });
 
   // simulated particles
   if (c) {
