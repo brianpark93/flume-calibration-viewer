@@ -1,13 +1,18 @@
 "use strict";
 
+const MAX_SELECTED = 6;
+const SELECTION_COLORS = ["#1a5fb4", "#c2185b", "#7b1fa2", "#00838f", "#e65100", "#33691e"];
+const PAPER_COMPOSITE_KEYS = ["score_rmse_global", "score_rmse_front", "score_rmse_mid", "score_rmse_tail",
+  "score_Ps", "score_Pv", "score_R", "score_Sfront", "score_Iratio"];
+
 const state = {
   manifest: null,
   angle: null,
-  data: null,       // parsed data/{angle}deg.json
-  grid: null,       // Map "gi,pj" -> cell
-  gi: 0, pj: 0,      // selected cell indices
-  metric: "combined", // "combined" | "rmse"
-  theme: null,
+  data: null,        // parsed data/{angle}deg.json
+  grid: null,        // Map "gi,pj" -> cell
+  selected: [],       // [{gi,pj}], order = selection order = color order
+  metric: "combined", // "combined" | "rmse" | "custom"
+  weights: {},        // score key -> 0..100
 };
 
 const els = {};
@@ -18,17 +23,22 @@ function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+function cellKey(gi, pj) { return gi + "," + pj; }
+
+function selectionColor(index) { return SELECTION_COLORS[index % SELECTION_COLORS.length]; }
+
+function selectionIndexOf(gi, pj) {
+  return state.selected.findIndex((s) => s.gi === gi && s.pj === pj);
+}
+
 // ---------------- color scale (RdYlGn, low=good=green, high=bad=red) ----------------
-const RDYLGN = [
-  [0.00, [0o0, 0, 0]], // placeholder replaced below
-];
 const RDYLGN_STOPS = [
   [165, 0, 38], [215, 48, 39], [244, 109, 67], [253, 174, 97], [254, 224, 139],
   [255, 255, 191], [217, 239, 139], [166, 217, 106], [102, 189, 99], [26, 152, 80], [0, 104, 55],
 ];
 
 function rdylgnColor(t) {
-  // t in [0,1], 0 = green (good), 1 = red (bad) -> reverse stop order
+  // t in [0,1], 0 = green (good), 1 = red (bad)
   t = Math.max(0, Math.min(1, t));
   const stops = RDYLGN_STOPS.slice().reverse();
   const n = stops.length - 1;
@@ -42,11 +52,39 @@ function rdylgnColor(t) {
   return `rgb(${r},${g},${bch})`;
 }
 
+// ---------------- custom weighted score ----------------
+
+function customScore(cell) {
+  if (!cell.scores) return null;
+  let num = 0, den = 0;
+  for (const key in state.weights) {
+    const w = state.weights[key];
+    const v = cell.scores[key];
+    if (w > 0 && v !== null && v !== undefined) {
+      num += w * v;
+      den += w;
+    }
+  }
+  return den > 0 ? num / den : null;
+}
+
+function cellMetricValue(cell) {
+  if (state.metric === "custom") return customScore(cell);
+  return cell[state.metric];
+}
+
+function metricIsHigherBetter() {
+  return state.metric === "custom";
+}
+
 // ---------------- data loading ----------------
 
 async function loadManifest() {
   const res = await fetch("data/manifest.json");
   state.manifest = await res.json();
+  (state.manifest.score_meta || []).forEach((m) => {
+    state.weights[m.key] = PAPER_COMPOSITE_KEYS.includes(m.key) ? 100 : 0;
+  });
 }
 
 async function loadAngle(angle) {
@@ -60,14 +98,13 @@ async function loadAngle(angle) {
   data.cells.forEach((c) => {
     const gi = data.gmod_vals.findIndex((g) => Math.abs(g - c.gmod) < 1e-4);
     const pj = data.phi_vals.findIndex((p) => Math.abs(p - c.phi) < 1e-4);
-    state.grid.set(gi + "," + pj, { ...c, gi, pj });
+    state.grid.set(cellKey(gi, pj), { ...c, gi, pj });
   });
 
   // select the best-combined cell by default
   let best = null;
   state.grid.forEach((c) => { if (!best || c.combined < best.combined) best = c; });
-  state.gi = best.gi;
-  state.pj = best.pj;
+  state.selected = best ? [{ gi: best.gi, pj: best.pj }] : [];
 
   els.status.textContent = "";
   els.heatmapWrap.classList.remove("is-loading");
@@ -76,10 +113,26 @@ async function loadAngle(angle) {
 
 // ---------------- heatmap rendering ----------------
 
+function bestCell() {
+  let best = null;
+  state.grid.forEach((c) => { if (!best || c.combined < best.combined) best = c; });
+  return best;
+}
+
 function metricRange() {
-  const key = state.metric;
-  const vals = Array.from(state.grid.values()).map((c) => c[key]).filter((v) => isFinite(v));
+  const higherBetter = metricIsHigherBetter();
+  const vals = [];
+  state.grid.forEach((c) => {
+    const v = cellMetricValue(c);
+    if (v !== null && v !== undefined && isFinite(v)) vals.push(v);
+  });
   vals.sort((a, b) => a - b);
+  if (!vals.length) return [0, 1];
+  if (higherBetter) {
+    const lo = vals[Math.ceil(vals.length * 0.1)] ?? vals[0];
+    const hi = vals[vals.length - 1];
+    return [lo, Math.max(hi, lo + 0.01)];
+  }
   const lo = vals[0];
   const hi = vals[Math.floor(vals.length * 0.9)];
   return [lo, Math.max(hi, lo + 0.01)];
@@ -102,10 +155,11 @@ function drawHeatmap() {
   ctx.clearRect(0, 0, w, h);
 
   const [lo, hi] = metricRange();
+  const higherBetter = metricIsHigherBetter();
 
   for (let gi = 0; gi < nG; gi++) {
     for (let pj = 0; pj < nP; pj++) {
-      const c = state.grid.get(gi + "," + pj);
+      const c = state.grid.get(cellKey(gi, pj));
       const x = gi * cell;
       const y = (nP - 1 - pj) * cell; // phi increases upward
       if (!c) {
@@ -113,26 +167,34 @@ function drawHeatmap() {
         ctx.fillRect(x, y, cell, cell);
         continue;
       }
-      const t = (c[state.metric] - lo) / (hi - lo);
+      const v = cellMetricValue(c);
+      if (v === null || v === undefined || !isFinite(v)) {
+        ctx.fillStyle = cssVar("--line");
+        ctx.fillRect(x, y, cell, cell);
+        continue;
+      }
+      let t = (v - lo) / (hi - lo);
+      if (higherBetter) t = 1 - t;
       ctx.fillStyle = rdylgnColor(t);
       ctx.fillRect(x, y, cell, cell);
     }
   }
 
-  // best-cell marker
-  let best = null;
-  state.grid.forEach((c) => { if (!best || c.combined < best.combined) best = c; });
+  // best-cell marker (always by combined score, regardless of display metric)
+  const best = bestCell();
   if (best) {
     const bx = best.gi * cell + cell / 2;
     const by = (nP - 1 - best.pj) * cell + cell / 2;
     drawStar(ctx, bx, by, Math.max(5, cell * 0.28), cssVar("--focus"));
   }
 
-  // selection outline
-  const selX = state.gi * cell, selY = (nP - 1 - state.pj) * cell;
-  ctx.strokeStyle = cssVar("--ink");
-  ctx.lineWidth = 2;
-  ctx.strokeRect(selX + 1, selY + 1, cell - 2, cell - 2);
+  // selection outlines, one colour per selected cell
+  state.selected.forEach((s, idx) => {
+    const selX = s.gi * cell, selY = (nP - 1 - s.pj) * cell;
+    ctx.strokeStyle = selectionColor(idx);
+    ctx.lineWidth = 3;
+    ctx.strokeRect(selX + 1.5, selY + 1.5, cell - 3, cell - 3);
+  });
 
   els.heatmapMeta.textContent =
     `gmod ${data.gmod_vals[0].toFixed(1)}–${data.gmod_vals[nG - 1].toFixed(1)} MPa  ×  ` +
@@ -170,11 +232,16 @@ function heatmapPick(evt) {
   const nP = data.phi_vals.length;
   const gi = Math.max(0, Math.min(data.gmod_vals.length - 1, Math.floor(x / cell)));
   const pj = Math.max(0, Math.min(nP - 1, nP - 1 - Math.floor(y / cell)));
-  if (state.grid.has(gi + "," + pj)) {
-    state.gi = gi;
-    state.pj = pj;
-    renderAll();
+  if (!state.grid.has(cellKey(gi, pj))) return;
+
+  const idx = selectionIndexOf(gi, pj);
+  if (idx >= 0) {
+    state.selected.splice(idx, 1); // toggle off
+  } else {
+    if (state.selected.length >= MAX_SELECTED) state.selected.shift(); // drop oldest
+    state.selected.push({ gi, pj });
   }
+  renderAll();
 }
 
 // ---------------- detail (particle) plot ----------------
@@ -182,7 +249,6 @@ function heatmapPick(evt) {
 function drawDetail() {
   const canvas = els.detail;
   const data = state.data;
-  const c = state.grid.get(state.gi + "," + state.pj);
   const wrapW = canvas.parentElement.clientWidth;
   const w = Math.min(680, wrapW);
   const h = Math.round(w * 0.62);
@@ -195,18 +261,13 @@ function drawDetail() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
-  // domain: fixed per angle so the view doesn't jump between cells
   const wallX = (data.wall_segments || []).flatMap((s) => s.x);
   const wallZ = (data.wall_segments || []).flatMap((s) => s.z);
   const allX = data.exp_x.concat(wallX);
   let xMin = -0.25, xMax = Math.max(1.1, Math.max(...allX) + 0.15);
-  // particles that end up below the floor are numerical stragglers, not
-  // real deposit -- hide them rather than cluttering the plot
   const floorZ = wallZ.length ? Math.min(...wallZ) : -Infinity;
   let zMin = -0.08, zMax = 0.38;
 
-  // equal-aspect scale: same pixels-per-metre for x and z, so the plot is
-  // never stretched. Fit inside the available area, then centre it.
   const padL = 42, padR = 14, padT = 10, padB = 26;
   const availW = w - padL - padR;
   const availH = h - padT - padB;
@@ -219,7 +280,6 @@ function drawDetail() {
   const sx = (x) => originX + (x - xMin) * scale;
   const sy = (z) => originY + plotH - (z - zMin) * scale;
 
-  // grid
   ctx.strokeStyle = cssVar("--line");
   ctx.lineWidth = 1;
   ctx.font = "10.5px Arial, Helvetica, sans-serif";
@@ -235,9 +295,8 @@ function drawDetail() {
     ctx.fillText(zv.toFixed(2), 2, py + 3);
   }
 
-  // wall -- slide and floor are separate physical parts (separate rigid
-  // node sets); draw each segment as its own polyline so they never
-  // connect to each other and zigzag across the plot.
+  // wall -- slide and floor are separate physical parts; draw each
+  // segment as its own polyline so they never connect to each other.
   ctx.strokeStyle = cssVar("--ink-faint");
   ctx.lineWidth = 2;
   (data.wall_segments || []).forEach((seg) => {
@@ -249,50 +308,45 @@ function drawDetail() {
     ctx.stroke();
   });
 
-  // simulated particles (below-floor stragglers hidden)
-  if (c) {
-    ctx.fillStyle = "rgba(80, 80, 80, 0.45)";
+  // simulated particles, one colour per selected cell (below-floor hidden)
+  state.selected.forEach((s, idx) => {
+    const c = state.grid.get(cellKey(s.gi, s.pj));
+    if (!c) return;
+    const [r, g, b] = hexToRgb(selectionColor(idx));
+    ctx.fillStyle = `rgba(${r},${g},${b},0.5)`;
     for (let i = 0; i < c.px.length; i++) {
       if (c.pz[i] < floorZ) continue;
       const px = sx(c.px[i]), py = sy(c.pz[i]);
       if (px < 0 || px > w || py < 0 || py > h) continue;
       ctx.beginPath();
-      ctx.arc(px, py, 1.4, 0, Math.PI * 2);
+      ctx.arc(px, py, 1.5, 0, Math.PI * 2);
       ctx.fill();
     }
-  }
+  });
 
-  // experiment curve
-  ctx.strokeStyle = cssVar("--focus");
-  ctx.lineWidth = 2.2;
+  // experiment curve, drawn last so it stays legible over particles
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 2.4;
   ctx.beginPath();
   data.exp_x.forEach((x, i) => {
     const px = sx(x), py = sy(data.exp_z[i]);
     i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
   });
   ctx.stroke();
-  ctx.fillStyle = cssVar("--focus");
-  data.exp_x.forEach((x, i) => {
-    const px = sx(x), py = sy(data.exp_z[i]);
-    ctx.beginPath(); ctx.arc(px, py, 1.8, 0, Math.PI * 2); ctx.fill();
-  });
 
-  // axis border
   ctx.strokeStyle = cssVar("--line-strong");
   ctx.lineWidth = 1.2;
   ctx.strokeRect(originX, originY, plotW, plotH);
 }
 
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
 // ---------------- readouts ----------------
 
 function renderReadouts() {
-  const c = state.grid.get(state.gi + "," + state.pj);
-  if (!c) return;
-  els.statGmod.textContent = c.gmod.toFixed(2) + " MPa";
-  els.statPhi.textContent = c.phi.toFixed(3) + " rad";
-  els.statRmse.textContent = c.rmse.toFixed(2) + " cm";
-  els.statCombined.textContent = c.combined.toFixed(2) + " cm";
-
   const info = state.manifest.angles.find((a) => a.angle === state.angle);
   if (info) {
     els.bestGmod.textContent = info.best_gmod.toFixed(2) + " MPa";
@@ -300,6 +354,29 @@ function renderReadouts() {
     els.bestRmse.textContent = info.best_rmse.toFixed(2) + " cm";
     els.bestCombined.textContent = info.best_combined.toFixed(2) + " cm";
   }
+
+  els.compareBody.innerHTML = "";
+  if (!state.selected.length) {
+    els.compareEmpty.style.display = "block";
+    return;
+  }
+  els.compareEmpty.style.display = "none";
+
+  state.selected.forEach((s, idx) => {
+    const c = state.grid.get(cellKey(s.gi, s.pj));
+    if (!c) return;
+    const cs = customScore(c);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><span class="chip" style="background:${selectionColor(idx)}"></span></td>
+      <td class="num">${c.gmod.toFixed(2)}</td>
+      <td class="num">${c.phi.toFixed(3)}</td>
+      <td class="num">${c.rmse.toFixed(2)}</td>
+      <td class="num">${c.combined.toFixed(2)}</td>
+      <td class="num">${cs === null ? "–" : cs.toFixed(1)}</td>
+    `;
+    els.compareBody.appendChild(tr);
+  });
 }
 
 function renderAll() {
@@ -329,6 +406,41 @@ function renderAngleList() {
   });
 }
 
+// ---------------- scoring panel ----------------
+
+function renderScoringPanel() {
+  els.scoreRows.innerHTML = "";
+  (state.manifest.score_meta || []).forEach((m) => {
+    const row = document.createElement("div");
+    row.className = "score-row";
+    const w = state.weights[m.key] ?? 0;
+    row.innerHTML = `
+      <label class="score-label" for="w_${m.key}">${m.label}</label>
+      <input type="range" min="0" max="100" step="5" value="${w}" id="w_${m.key}" data-key="${m.key}" />
+      <span class="score-val num" id="wv_${m.key}">${w}</span>
+    `;
+    els.scoreRows.appendChild(row);
+    row.querySelector("input").addEventListener("input", (e) => {
+      const val = parseInt(e.target.value, 10);
+      state.weights[m.key] = val;
+      $("wv_" + m.key).textContent = val;
+      if (state.metric === "custom") drawHeatmap();
+      renderReadouts();
+    });
+  });
+}
+
+function applyPreset(preset) {
+  (state.manifest.score_meta || []).forEach((m) => {
+    if (preset === "paper") state.weights[m.key] = PAPER_COMPOSITE_KEYS.includes(m.key) ? 100 : 0;
+    else if (preset === "equal") state.weights[m.key] = 100;
+    else if (preset === "clear") state.weights[m.key] = 0;
+  });
+  renderScoringPanel();
+  if (state.metric === "custom") drawHeatmap();
+  renderReadouts();
+}
+
 // ---------------- init ----------------
 
 async function init() {
@@ -338,18 +450,16 @@ async function init() {
   els.heatmapMeta = $("heatmapMeta");
   els.detail = $("detailCanvas");
   els.status = $("status");
-  els.statGmod = $("statGmod");
-  els.statPhi = $("statPhi");
-  els.statRmse = $("statRmse");
-  els.statCombined = $("statCombined");
   els.bestGmod = $("bestGmod");
   els.bestPhi = $("bestPhi");
   els.bestRmse = $("bestRmse");
   els.bestCombined = $("bestCombined");
   els.metricBtns = document.querySelectorAll(".metric-toggle button");
+  els.compareBody = $("compareBody");
+  els.compareEmpty = $("compareEmpty");
+  els.scoreRows = $("scoreRows");
 
   els.heatmap.addEventListener("click", heatmapPick);
-  els.heatmap.addEventListener("mousemove", (e) => { if (e.buttons === 1) heatmapPick(e); });
 
   els.metricBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -360,10 +470,15 @@ async function init() {
     });
   });
 
+  $("presetPaper").addEventListener("click", () => applyPreset("paper"));
+  $("presetEqual").addEventListener("click", () => applyPreset("equal"));
+  $("presetClear").addEventListener("click", () => applyPreset("clear"));
+
   window.addEventListener("resize", () => { if (state.data) renderAll(); });
 
   await loadManifest();
   renderAngleList();
+  renderScoringPanel();
   const first = state.manifest.angles.find((a) => a.n_cells > 0);
   if (first) await loadAngle(first.angle);
 }
