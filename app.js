@@ -197,8 +197,12 @@ function drawDetail() {
 
   // domain: fixed per angle so the view doesn't jump between cells
   const wallX = (data.wall_segments || []).flatMap((s) => s.x);
+  const wallZ = (data.wall_segments || []).flatMap((s) => s.z);
   const allX = data.exp_x.concat(wallX);
   let xMin = -0.25, xMax = Math.max(1.1, Math.max(...allX) + 0.15);
+  // particles that end up below the floor are numerical stragglers, not
+  // real deposit -- hide them rather than cluttering the plot
+  const floorZ = wallZ.length ? Math.min(...wallZ) : -Infinity;
   let zMin = -0.08, zMax = 0.38;
 
   // equal-aspect scale: same pixels-per-metre for x and z, so the plot is
@@ -245,10 +249,11 @@ function drawDetail() {
     ctx.stroke();
   });
 
-  // simulated particles
+  // simulated particles (below-floor stragglers hidden)
   if (c) {
     ctx.fillStyle = "rgba(80, 80, 80, 0.45)";
     for (let i = 0; i < c.px.length; i++) {
+      if (c.pz[i] < floorZ) continue;
       const px = sx(c.px[i]), py = sy(c.pz[i]);
       if (px < 0 || px > w || py < 0 || py > h) continue;
       ctx.beginPath();
