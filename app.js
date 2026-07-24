@@ -11,6 +11,7 @@ const state = {
   grid: null,        // Map "gi,pj" -> cell
   selected: [],       // [{gi,pj}], order = selection order = color order
   weights: {},        // score key -> 0..100
+  overlays: { centroid: false, peak: false, runout: false, frontslope: false },
 };
 
 const els = {};
@@ -316,9 +317,74 @@ function drawDetail() {
   });
   ctx.stroke();
 
+  // geometry overlays (centroid/peak/runout/front-slope), on top of everything
+  const anyOverlay = Object.values(state.overlays).some(Boolean);
+  if (anyOverlay) {
+    if (data.exp_geo) drawGeoSet(ctx, sx, sy, data.exp_geo, "#000000", floorZ, data.z_th, data.exp_x[0]);
+    state.selected.forEach((s, idx) => {
+      const c = state.grid.get(cellKey(s.gi, s.pj));
+      if (c && c.geo) drawGeoSet(ctx, sx, sy, c.geo, selectionColor(idx), floorZ, data.z_th, data.exp_x[0]);
+    });
+  }
+
   ctx.strokeStyle = cssVar("--line-strong");
   ctx.lineWidth = 1.2;
   ctx.strokeRect(originX, originY, plotW, plotH);
+}
+
+// geo = {cs, cv, ps, pv, r, sf_k, sf_b[, xfront]}; xfront lives on exp_geo only,
+// so front-slope re-uses exp_geo.xfront for every series (sim and exp share
+// the same front-region x-window by construction).
+function drawGeoSet(ctx, sx, sy, geo, color, floorZ, zTh, xDomainMin) {
+  const xfront = (state.data.exp_geo && state.data.exp_geo.xfront != null) ? state.data.exp_geo.xfront : null;
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+
+  if (state.overlays.centroid && geo.cs != null && geo.cv != null) {
+    drawDiamond(ctx, sx(geo.cs), sy(geo.cv), 5);
+  }
+  if (state.overlays.peak && geo.ps != null && geo.pv != null) {
+    drawTriangle(ctx, sx(geo.ps), sy(geo.pv), 6);
+  }
+  if (state.overlays.runout && geo.r != null) {
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(sx(geo.r), sy(floorZ));
+    ctx.lineTo(sx(geo.r), sy(zTh));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  if (state.overlays.frontslope && geo.sf_k != null && geo.sf_b != null && xfront != null) {
+    const x0 = xDomainMin, x1 = xfront;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(sx(x0), sy(geo.sf_k * x0 + geo.sf_b));
+    ctx.lineTo(sx(x1), sy(geo.sf_k * x1 + geo.sf_b));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawDiamond(ctx, cx, cy, r) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy); ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r, cy);
+  ctx.closePath();
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
+}
+
+function drawTriangle(ctx, cx, cy, r) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy + r); ctx.lineTo(cx - r, cy + r);
+  ctx.closePath();
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
 }
 
 function hexToRgb(hex) {
@@ -445,6 +511,13 @@ async function init() {
   $("presetPaper").addEventListener("click", () => applyPreset("paper"));
   $("presetEqual").addEventListener("click", () => applyPreset("equal"));
   $("presetClear").addEventListener("click", () => applyPreset("clear"));
+
+  document.querySelectorAll("#overlayToggles input[type=checkbox]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      state.overlays[cb.dataset.overlay] = cb.checked;
+      if (state.data) drawDetail();
+    });
+  });
 
   window.addEventListener("resize", () => { if (state.data) renderAll(); });
 
