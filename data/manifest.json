@@ -83,10 +83,6 @@
       "label": "Runout distance"
     },
     {
-      "key": "score_Sfront",
-      "label": "Front slope"
-    },
-    {
       "key": "score_A",
       "label": "Total area"
     },
