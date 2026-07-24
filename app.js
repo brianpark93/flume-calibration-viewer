@@ -2,7 +2,6 @@
 
 const MAX_SELECTED = 6;
 const SELECTION_COLORS = ["#1a5fb4", "#c2185b", "#7b1fa2", "#00838f", "#e65100", "#33691e"];
-const PAPER_COMPOSITE_KEYS = ["score_rmse", "score_Ps", "score_Pv", "score_R", "score_Sfront", "score_Iratio"];
 
 const state = {
   manifest: null,
@@ -11,7 +10,7 @@ const state = {
   grid: null,        // Map "gi,pj" -> cell
   selected: [],       // [{gi,pj}], order = selection order = color order
   weights: {},        // score key -> 0..100
-  overlays: { centroid: false, peak: false, runout: false, frontslope: false },
+  overlays: { centroid: false, peak: false, runout: false },
 };
 
 const els = {};
@@ -73,7 +72,7 @@ async function loadManifest() {
   const res = await fetch("data/manifest.json");
   state.manifest = await res.json();
   (state.manifest.score_meta || []).forEach((m) => {
-    state.weights[m.key] = PAPER_COMPOSITE_KEYS.includes(m.key) ? 100 : 0;
+    state.weights[m.key] = 100; // default: equal weight across all metrics
   });
 }
 
@@ -91,9 +90,8 @@ async function loadAngle(angle) {
     state.grid.set(cellKey(gi, pj), { ...c, gi, pj });
   });
 
-  // select the best-combined cell by default
-  let best = null;
-  state.grid.forEach((c) => { if (!best || c.combined < best.combined) best = c; });
+  // select the best cell (by current custom scoring weights) by default
+  const best = bestCell();
   state.selected = best ? [{ gi: best.gi, pj: best.pj }] : [];
 
   els.status.textContent = "";
@@ -103,9 +101,17 @@ async function loadAngle(angle) {
 
 // ---------------- heatmap rendering ----------------
 
+// "Best" is derived live from the current custom scoring weights, not a
+// fixed metric -- moving a slider can change which cell is best.
 function bestCell() {
-  let best = null;
-  state.grid.forEach((c) => { if (!best || c.combined < best.combined) best = c; });
+  let best = null, bestScore = -Infinity;
+  state.grid.forEach((c) => {
+    const v = customScore(c);
+    if (v !== null && v !== undefined && isFinite(v) && v > bestScore) {
+      bestScore = v;
+      best = c;
+    }
+  });
   return best;
 }
 
@@ -163,7 +169,7 @@ function drawHeatmap() {
     }
   }
 
-  // best-cell marker (always by combined score, regardless of display metric)
+  // best-cell marker, live from current custom scoring weights
   const best = bestCell();
   if (best) {
     const bx = best.gi * cell + cell / 2;
@@ -317,13 +323,16 @@ function drawDetail() {
   });
   ctx.stroke();
 
-  // geometry overlays (centroid/peak/runout/front-slope), on top of everything
+  // geometry overlays (centroid/peak/runout), drawn on top of everything.
+  // Each shape is deliberately distinct (circle+crosshair vs. triangle vs.
+  // dashed line) and outlined in black so they read clearly even when two
+  // overlays land close together or sit over the particle cloud.
   const anyOverlay = Object.values(state.overlays).some(Boolean);
   if (anyOverlay) {
-    if (data.exp_geo) drawGeoSet(ctx, sx, sy, data.exp_geo, "#000000", floorZ, data.z_th, data.exp_x[0]);
+    if (data.exp_geo) drawGeoSet(ctx, sx, sy, data.exp_geo, "#000000", floorZ, data.z_th);
     state.selected.forEach((s, idx) => {
       const c = state.grid.get(cellKey(s.gi, s.pj));
-      if (c && c.geo) drawGeoSet(ctx, sx, sy, c.geo, selectionColor(idx), floorZ, data.z_th, data.exp_x[0]);
+      if (c && c.geo) drawGeoSet(ctx, sx, sy, c.geo, selectionColor(idx), floorZ, data.z_th);
     });
   }
 
@@ -332,59 +341,60 @@ function drawDetail() {
   ctx.strokeRect(originX, originY, plotW, plotH);
 }
 
-// geo = {cs, cv, ps, pv, r, sf_k, sf_b[, xfront]}; xfront lives on exp_geo only,
-// so front-slope re-uses exp_geo.xfront for every series (sim and exp share
-// the same front-region x-window by construction).
-function drawGeoSet(ctx, sx, sy, geo, color, floorZ, zTh, xDomainMin) {
-  const xfront = (state.data.exp_geo && state.data.exp_geo.xfront != null) ? state.data.exp_geo.xfront : null;
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.strokeStyle = color;
-
+// geo = {cs, cv, ps, pv, r}
+function drawGeoSet(ctx, sx, sy, geo, color, floorZ, zTh) {
   if (state.overlays.centroid && geo.cs != null && geo.cv != null) {
-    drawDiamond(ctx, sx(geo.cs), sy(geo.cv), 5);
+    drawCentroidMark(ctx, sx(geo.cs), sy(geo.cv), 6, color);
   }
   if (state.overlays.peak && geo.ps != null && geo.pv != null) {
-    drawTriangle(ctx, sx(geo.ps), sy(geo.pv), 6);
+    drawPeakMark(ctx, sx(geo.ps), sy(geo.pv), 9, color);
   }
   if (state.overlays.runout && geo.r != null) {
-    ctx.lineWidth = 1.6;
-    ctx.setLineDash([4, 3]);
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
     ctx.beginPath();
     ctx.moveTo(sx(geo.r), sy(floorZ));
     ctx.lineTo(sx(geo.r), sy(zTh));
     ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.restore();
   }
-  if (state.overlays.frontslope && geo.sf_k != null && geo.sf_b != null && xfront != null) {
-    const x0 = xDomainMin, x1 = xfront;
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.moveTo(sx(x0), sy(geo.sf_k * x0 + geo.sf_b));
-    ctx.lineTo(sx(x1), sy(geo.sf_k * x1 + geo.sf_b));
-    ctx.stroke();
-  }
+}
+
+// circle + crosshair, distinct from the peak triangle at a glance
+function drawCentroidMark(ctx, cx, cy, r, color) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#000000";
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx - r * 1.7, cy); ctx.lineTo(cx + r * 1.7, cy);
+  ctx.moveTo(cx, cy - r * 1.7); ctx.lineTo(cx, cy + r * 1.7);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
   ctx.restore();
 }
 
-function drawDiamond(ctx, cx, cy, r) {
+// upward triangle, apex sits exactly on the peak point
+function drawPeakMark(ctx, cx, cy, r, color) {
+  ctx.save();
   ctx.beginPath();
-  ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy); ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r, cy);
+  ctx.moveTo(cx, cy - r);
+  ctx.lineTo(cx + r * 0.95, cy + r * 0.75);
+  ctx.lineTo(cx - r * 0.95, cy + r * 0.75);
   ctx.closePath();
+  ctx.fillStyle = color;
   ctx.fill();
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#000000";
   ctx.stroke();
-}
-
-function drawTriangle(ctx, cx, cy, r) {
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy + r); ctx.lineTo(cx - r, cy + r);
-  ctx.closePath();
-  ctx.fill();
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = "#ffffff";
-  ctx.stroke();
+  ctx.restore();
 }
 
 function hexToRgb(hex) {
@@ -395,12 +405,14 @@ function hexToRgb(hex) {
 // ---------------- readouts ----------------
 
 function renderReadouts() {
-  const info = state.manifest.angles.find((a) => a.angle === state.angle);
-  if (info) {
-    els.bestGmod.textContent = info.best_gmod.toFixed(2) + " MPa";
-    els.bestPhi.textContent = info.best_phi.toFixed(3) + " rad";
-    els.bestRmse.textContent = info.best_rmse.toFixed(2) + " cm";
-    els.bestCombined.textContent = info.best_combined.toFixed(2) + " cm";
+  const best = bestCell();
+  if (best) {
+    const bs = customScore(best);
+    els.bestGmod.textContent = best.gmod.toFixed(2) + " MPa";
+    els.bestPhi.textContent = best.phi.toFixed(3) + " rad";
+    els.bestRmse.textContent = best.rmse.toFixed(2) + " cm";
+    els.bestCombined.textContent = best.combined.toFixed(2) + " cm";
+    els.bestScore.textContent = bs === null ? "–" : bs.toFixed(1);
   }
 
   els.compareBody.innerHTML = "";
@@ -480,8 +492,7 @@ function renderScoringPanel() {
 
 function applyPreset(preset) {
   (state.manifest.score_meta || []).forEach((m) => {
-    if (preset === "paper") state.weights[m.key] = PAPER_COMPOSITE_KEYS.includes(m.key) ? 100 : 0;
-    else if (preset === "equal") state.weights[m.key] = 100;
+    if (preset === "equal") state.weights[m.key] = 100;
     else if (preset === "clear") state.weights[m.key] = 0;
   });
   renderScoringPanel();
@@ -502,13 +513,13 @@ async function init() {
   els.bestPhi = $("bestPhi");
   els.bestRmse = $("bestRmse");
   els.bestCombined = $("bestCombined");
+  els.bestScore = $("bestScore");
   els.compareBody = $("compareBody");
   els.compareEmpty = $("compareEmpty");
   els.scoreRows = $("scoreRows");
 
   els.heatmap.addEventListener("click", heatmapPick);
 
-  $("presetPaper").addEventListener("click", () => applyPreset("paper"));
   $("presetEqual").addEventListener("click", () => applyPreset("equal"));
   $("presetClear").addEventListener("click", () => applyPreset("clear"));
 
