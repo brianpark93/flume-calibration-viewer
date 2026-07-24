@@ -27,13 +27,14 @@
       <div class="readout-row"><span class="k">phi</span><span class="v num" id="bestPhi">–</span></div>
       <div class="readout-row"><span class="k">RMSE</span><span class="v num" id="bestRmse">–</span></div>
       <div class="readout-row"><span class="k">combined</span><span class="v num" id="bestCombined">–</span></div>
+      <div class="readout-row"><span class="k">custom score</span><span class="v num" id="bestScore">–</span></div>
     </div>
 
     <p class="legend-note">
       Each cell is one SPH solve: fixed gmod &amp; phi, deposit compared
-      against the scaled experimental profile. <strong>combined</strong>
-      adds a penalty for simulated material that overruns past the
-      experiment&rsquo;s toe &mdash; RMSE alone can miss that.
+      against the scaled experimental profile. The star and the
+      &ldquo;best fit&rdquo; numbers are always the top cell under your
+      current custom scoring weights.
     </p>
   </aside>
 
@@ -41,18 +42,18 @@
     <div class="main-header">
       <div class="main-header-text">
         <h2 class="display">gmod &times; phi fit quality</h2>
-        <p>Click cells to select up to six at once &mdash; each gets its own colour in the particle plot and comparison table on the right. The heatmap is coloured by your custom weighted score; the star marks the best-fit cell by combined score.</p>
+        <p>Click cells to select up to six at once &mdash; each gets its own colour in the particle plot and comparison table on the right. The star marks the best-fit cell under your current custom scoring weights.</p>
       </div>
 
       <details class="scoring-panel" id="scoringPanel">
-        <summary>Custom scoring (9-metric)</summary>
+        <summary>Custom scoring (8-metric)</summary>
         <p class="legend-note">
           Weight each metric from the multi-metric evaluation framework to
-          set how the heatmap colouring is computed.
+          set how the heatmap colouring &mdash; and the best-fit cell &mdash;
+          are computed.
         </p>
         <div class="score-preset-row">
-          <button type="button" id="presetPaper">Paper (6)</button>
-          <button type="button" id="presetEqual">Equal (9)</button>
+          <button type="button" id="presetEqual">Equal (8)</button>
           <button type="button" id="presetClear">Clear</button>
         </div>
         <div id="scoreRows" class="score-rows"></div>
@@ -81,10 +82,9 @@
           <span class="hint">particles vs. experiment</span>
         </div>
         <div class="overlay-toggles" id="overlayToggles">
-          <label><input type="checkbox" data-overlay="centroid" />Centroid</label>
-          <label><input type="checkbox" data-overlay="peak" />Peak</label>
-          <label><input type="checkbox" data-overlay="runout" />Runout</label>
-          <label><input type="checkbox" data-overlay="frontslope" />Front slope</label>
+          <label><input type="checkbox" data-overlay="centroid" /><span class="ov-icon ov-icon-centroid" aria-hidden="true"></span>Centroid</label>
+          <label><input type="checkbox" data-overlay="peak" /><span class="ov-icon ov-icon-peak" aria-hidden="true"></span>Peak</label>
+          <label><input type="checkbox" data-overlay="runout" /><span class="ov-icon ov-icon-runout" aria-hidden="true"></span>Runout</label>
         </div>
         <div class="canvas-wrap">
           <canvas id="detailCanvas" width="680" height="420"></canvas>
