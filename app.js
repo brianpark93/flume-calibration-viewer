@@ -240,7 +240,14 @@ function drawDetail() {
   const data = state.data;
   const wrapW = canvas.parentElement.clientWidth;
   const w = Math.min(680, wrapW);
-  const h = Math.round(w * 0.62);
+
+  const xMin = -0.2, xMax = 1.0, zMin = -0.1, zMax = 0.2;
+  const padL = 42, padR = 14, padT = 10, padB = 26;
+  const availW = w - padL - padR;
+  // pick canvas height so the fixed x/z window fills it with no wasted
+  // whitespace, instead of a fixed aspect ratio tuned for the old bounds
+  const h = Math.round(availW * (zMax - zMin) / (xMax - xMin) + padT + padB);
+
   const dpr = window.devicePixelRatio || 1;
   canvas.width = w * dpr;
   canvas.height = h * dpr;
@@ -250,15 +257,8 @@ function drawDetail() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
-  const wallX = (data.wall_segments || []).flatMap((s) => s.x);
   const wallZ = (data.wall_segments || []).flatMap((s) => s.z);
-  const allX = data.exp_x.concat(wallX);
-  let xMin = -0.25, xMax = Math.max(1.1, Math.max(...allX) + 0.15);
   const floorZ = wallZ.length ? Math.min(...wallZ) : -Infinity;
-  let zMin = -0.08, zMax = 0.38;
-
-  const padL = 42, padR = 14, padT = 10, padB = 26;
-  const availW = w - padL - padR;
   const availH = h - padT - padB;
   const scale = Math.min(availW / (xMax - xMin), availH / (zMax - zMin));
   const plotW = (xMax - xMin) * scale;
